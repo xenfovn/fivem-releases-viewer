@@ -213,7 +213,7 @@ The application requires no environment variables for basic functionality. All c
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the [GPL-3.0 License](LICENSE).
 
 ## 🐛 Known Issues & Future Enhancements
 
