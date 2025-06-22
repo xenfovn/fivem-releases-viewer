@@ -12,56 +12,62 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import type { ProcessedTopic } from '$lib/types';
-	
+
 	export let data: PageData;
-	
+
 	let showSettings = false;
 	let isFilterLoading = false;
 	let isInfiniteLoading = false;
-	
+
 	// Initialize topics state with server data
 	let allTopics: ProcessedTopic[] = data.topics || [];
 	let currentPage = data.currentPage || 1;
 	let hasMorePages = data.hasMorePages || false;
-	
+
 	// Grid layout state with localStorage persistence
 	let gridColumns = 3; // Default value
 	let resourceTypeFilter = 'all'; // Default to show all resources
-	
+	let searchQuery = '';
+
 	// Load preferences from localStorage on client
 	if (browser) {
 		const savedColumns = localStorage.getItem('gridColumns');
 		if (savedColumns) {
 			const parsedColumns = parseInt(savedColumns, 10) || 3;
 			// Only allow 3 or 4 columns, default to 3 for invalid values
-			gridColumns = (parsedColumns === 3 || parsedColumns === 4) ? parsedColumns : 3;
+			gridColumns = parsedColumns === 3 || parsedColumns === 4 ? parsedColumns : 3;
 		}
-		
+
 		const savedResourceFilter = localStorage.getItem('resourceTypeFilter');
 		if (savedResourceFilter) {
 			resourceTypeFilter = savedResourceFilter;
 		}
+
+		const savedSearchQuery = localStorage.getItem('searchQuery');
+		if (savedSearchQuery) {
+			searchQuery = savedSearchQuery;
+		}
 	}
-	
+
 	// Update state when data changes (e.g., filter change)
 	$: {
 		allTopics = data.topics || [];
 		currentPage = data.currentPage || 1;
 		hasMorePages = data.hasMorePages || false;
 	}
-	
+
 	function openSettings() {
 		showSettings = true;
 	}
-	
+
 	function closeSettings() {
 		showSettings = false;
 	}
-	
+
 	async function handleFilterChange(event: CustomEvent<string>) {
 		const newFilter = event.detail;
 		isFilterLoading = true;
-		
+
 		try {
 			// Update URL with new filter parameter
 			const url = new URL($page.url);
@@ -70,21 +76,21 @@
 			} else {
 				url.searchParams.set('filter', newFilter);
 			}
-			
+
 			// Navigate to new URL which will trigger server load
-			await goto(url.toString(), { 
+			await goto(url.toString(), {
 				invalidateAll: true,
-				noScroll: true 
+				noScroll: true
 			});
 		} finally {
 			isFilterLoading = false;
 		}
 	}
-	
+
 	function handleGridChange(event: CustomEvent<number>) {
 		const newColumns = event.detail;
 		gridColumns = newColumns;
-		
+
 		// Save to localStorage
 		if (browser) {
 			localStorage.setItem('gridColumns', newColumns.toString());
@@ -94,42 +100,52 @@
 	function handleResourceTypeChange(event: CustomEvent<string>) {
 		const newType = event.detail;
 		resourceTypeFilter = newType;
-		
+
 		// Save to localStorage
 		if (browser) {
 			localStorage.setItem('resourceTypeFilter', newType);
 		}
 	}
-	
+
+	function handleSearchChange(event: CustomEvent<string>) {
+		const newQuery = event.detail;
+		searchQuery = newQuery;
+
+		// Save to localStorage
+		if (browser) {
+			localStorage.setItem('searchQuery', newQuery);
+		}
+	}
+
 	function handleLoadMore(event: CustomEvent) {
 		const { topics, currentPage: newPage, hasMorePages: morePages } = event.detail;
-		
+
 		// Append new topics to existing array
 		allTopics = [...allTopics, ...topics];
 		currentPage = newPage;
 		hasMorePages = morePages;
 		isInfiniteLoading = false;
-		
+
 		console.log(`✅ Loaded page ${newPage}, now showing ${allTopics.length} topics total`);
 	}
-	
+
 	function handleInfiniteScrollError(event: CustomEvent) {
 		console.error('Infinite scroll error:', event.detail);
 		isInfiniteLoading = false;
 	}
-	
+
 	// Set loading state when infinite scroll starts
 	function handleInfiniteScrollStart() {
 		isInfiniteLoading = true;
 	}
-	
+
 	function getAvatarUrl(template: string, size: number = 48): string {
 		if (template.startsWith('http')) {
 			return template.replace('{size}', size.toString());
 		}
 		return `https://forum.cfx.re${template}`.replace('{size}', size.toString());
 	}
-	
+
 	function formatNumber(num: number): string {
 		if (num >= 1000) {
 			return (num / 1000).toFixed(1) + 'k';
@@ -138,7 +154,7 @@
 	}
 
 	function getResourceType(tags: string[]): 'paid' | 'free' | 'unknown' {
-		const lowerTags = tags.map(tag => tag.toLowerCase());
+		const lowerTags = tags.map((tag) => tag.toLowerCase());
 		if (lowerTags.includes('paid')) {
 			return 'paid';
 		} else if (lowerTags.includes('free')) {
@@ -147,31 +163,83 @@
 		return 'unknown';
 	}
 
-	// Create a reactive statement to filter topics based on resource type
-	$: filteredTopics = resourceTypeFilter === 'all' 
-		? allTopics 
-		: allTopics.filter(topic => {
-			const resourceType = getResourceType(topic.tags);
-			return resourceTypeFilter === resourceType;
-		});
+	// Search and filter function
+	function searchAndFilterTopics(
+		topics: ProcessedTopic[],
+		query: string,
+		typeFilter: string
+	): ProcessedTopic[] {
+		let filtered = topics;
+
+		// Apply resource type filter
+		if (typeFilter !== 'all') {
+			filtered = filtered.filter((topic) => {
+				const resourceType = getResourceType(topic.tags);
+				return typeFilter === resourceType;
+			});
+		}
+
+		// Apply search filter
+		if (query.trim()) {
+			const searchLower = query.toLowerCase().trim();
+
+			// Check if search query contains specific prefixes for targeted search
+			if (searchLower.startsWith('name:')) {
+				// Search only in titles/names
+				const nameQuery = searchLower.substring(5).trim();
+				filtered = filtered.filter((topic) => {
+					return topic.title.toLowerCase().includes(nameQuery);
+				});
+			} else if (searchLower.startsWith('tag:')) {
+				// Search only in tags
+				const tagQuery = searchLower.substring(4).trim();
+				filtered = filtered.filter((topic) => {
+					return topic.tags.some((tag) => tag.toLowerCase().includes(tagQuery));
+				});
+			} else if (searchLower.startsWith('author:')) {
+				// Search only in author names
+				const authorQuery = searchLower.substring(7).trim();
+				filtered = filtered.filter((topic) => {
+					return topic.author?.username.toLowerCase().includes(authorQuery) || false;
+				});
+			} else {
+				// General search across title, tags, and author
+				filtered = filtered.filter((topic) => {
+					const titleMatch = topic.title.toLowerCase().includes(searchLower);
+					const tagsMatch = topic.tags.some((tag) => tag.toLowerCase().includes(searchLower));
+					const authorMatch = topic.author?.username.toLowerCase().includes(searchLower) || false;
+					return titleMatch || tagsMatch || authorMatch;
+				});
+			}
+		}
+
+		return filtered;
+	}
+
+	// Create a reactive statement to filter and search topics
+	$: filteredTopics = searchAndFilterTopics(allTopics, searchQuery, resourceTypeFilter);
 </script>
 
 <svelte:head>
 	<title>FiveM Releases Viewer</title>
-	<meta name="description" content="Browse the latest FiveM releases from the CFX community forum" />
+	<meta
+		name="description"
+		content="Browse the latest FiveM releases from the CFX community forum"
+	/>
 </svelte:head>
 <PageHeader />
 <div class="container-fluid px-3 px-md-4">
-
 	<!-- View Controls (Sort + Grid Layout + Resource Type) -->
-	<ViewControls 
-		currentFilter={data.currentFilter || 'latest'} 
+	<ViewControls
+		currentFilter={data.currentFilter || 'latest'}
 		isLoading={isFilterLoading}
 		{gridColumns}
 		{resourceTypeFilter}
+		{searchQuery}
 		on:filterChange={handleFilterChange}
 		on:gridChange={handleGridChange}
 		on:resourceTypeChange={handleResourceTypeChange}
+		on:searchChange={handleSearchChange}
 	/>
 
 	{#if data.error}
@@ -207,9 +275,9 @@
 				<TopicCard {topic} />
 			{/each}
 		</div>
-		
+
 		<!-- Infinite Scroll Component -->
-		<InfiniteScroll 
+		<InfiniteScroll
 			currentFilter={data.currentFilter || 'latest'}
 			isLoading={isInfiniteLoading}
 			{hasMorePages}
@@ -229,7 +297,7 @@
 <SettingsModal isOpen={showSettings} on:close={closeSettings} />
 
 <!-- Debug: Scroll Status Indicator -->
-<ScrollStatus 
+<ScrollStatus
 	{currentPage}
 	{hasMorePages}
 	totalTopics={filteredTopics.length}
@@ -275,7 +343,7 @@
 			max-width: calc(100% - 3rem);
 		}
 	}
-	
+
 	/* Medium screens (768px - 991px) - Force 2 columns */
 	@media (max-width: 991px) {
 		.topics-grid {
@@ -283,7 +351,7 @@
 			max-width: calc(100% - 2rem);
 		}
 	}
-	
+
 	/* Small screens (up to 767px) - Single column */
 	@media (max-width: 767px) {
 		.topics-grid {
@@ -292,14 +360,14 @@
 			max-width: calc(100% - 1rem);
 		}
 	}
-	
+
 	/* Ensure consistent card heights in each row */
 	.topics-grid :global(.topic-card) {
 		height: 100%;
 		display: flex;
 		flex-direction: column;
 	}
-	
+
 	.topics-grid :global(.card-body) {
 		flex: 1;
 		display: flex;

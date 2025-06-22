@@ -3,12 +3,12 @@
 	export let hasMorePages: boolean = true;
 	export let totalTopics: number = 0;
 	export let isLoading: boolean = false;
-	
+
 	let isVisible = false;
-	
+
 	// Show status when scrolling
 	let scrollTimeout: number;
-	
+
 	function handleScroll() {
 		isVisible = true;
 		clearTimeout(scrollTimeout);
@@ -16,7 +16,7 @@
 			isVisible = false;
 		}, 2000);
 	}
-	
+
 	// Listen for scroll events
 	if (typeof window !== 'undefined') {
 		window.addEventListener('scroll', handleScroll);
@@ -69,41 +69,41 @@
 		backdrop-filter: blur(10px);
 		border: 1px solid rgba(255, 255, 255, 0.1);
 	}
-	
+
 	.scroll-status.visible {
 		opacity: 1;
 		transform: translateY(0);
 	}
-	
+
 	.status-content {
 		display: flex;
 		gap: 1rem;
 		align-items: center;
 	}
-	
+
 	.status-item {
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
 	}
-	
+
 	.status-label {
 		color: #ccc;
 	}
-	
+
 	.status-value {
 		font-weight: bold;
 		color: white;
 	}
-	
+
 	.status-yes {
-		color: #4CAF50;
+		color: #4caf50;
 	}
-	
+
 	.status-no {
 		color: #f44336;
 	}
-	
+
 	@media (max-width: 768px) {
 		.scroll-status {
 			top: 10px;
@@ -111,13 +111,13 @@
 			font-size: 0.7rem;
 			padding: 0.4rem 0.8rem;
 		}
-		
+
 		.status-content {
 			gap: 0.75rem;
 		}
-		
+
 		.status-item {
 			gap: 0.2rem;
 		}
 	}
-</style> 
+</style>
