@@ -106,4 +106,4 @@ export interface TopicDetailResponse {
 			created_at: string;
 		}>;
 	};
-} 
+}

@@ -1,26 +1,26 @@
 <script lang="ts">
 	import type { ProcessedTopic } from '$lib/types';
 	import Modal from './Modal.svelte';
-	
+
 	export let topic: ProcessedTopic;
-	
+
 	let showModal = false;
 	let previewContent: string | null = null;
 	let youtubeLinks: string[] = [];
 	let tebexLinks: string[] = [];
-	
+
 	$: titleInfo = cleanTitle(topic.title);
 	let loadingPreview = false;
 	let previewError = false;
 	let cardElement: HTMLElement;
-	
+
 	function getAvatarUrl(template: string, size: number = 48): string {
 		if (template.startsWith('http')) {
 			return template.replace('{size}', size.toString());
 		}
 		return `https://forum.cfx.re${template}`.replace('{size}', size.toString());
 	}
-	
+
 	function formatNumber(num: number): string {
 		if (num >= 1000) {
 			return (num / 1000).toFixed(1) + 'k';
@@ -31,11 +31,11 @@
 	function getYouTubeVideoId(url: string): string | null {
 		const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
 		const match = url.match(regExp);
-		return (match && match[7].length === 11) ? match[7] : null;
+		return match && match[7].length === 11 ? match[7] : null;
 	}
 
 	function getResourceTypeClass(tags: string[]): string {
-		const lowerTags = tags.map(tag => tag.toLowerCase());
+		const lowerTags = tags.map((tag) => tag.toLowerCase());
 		if (lowerTags.includes('paid')) {
 			return 'resource-paid';
 		} else if (lowerTags.includes('free')) {
@@ -129,13 +129,13 @@
 		};
 
 		let result = text;
-		
+
 		// Replace emoji codes
 		for (const [code, emoji] of Object.entries(emojiReplacements)) {
 			const regex = new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
 			result = result.replace(regex, emoji);
 		}
-		
+
 		return result;
 	}
 
@@ -144,7 +144,10 @@
 		const frameworks: string[] = [];
 
 		// Remove [FREE] or [PAID] tags (case insensitive)
-		cleanTitle = cleanTitle.replace(/\[(free|paid|Free|FREE|Paid|PAID|ESCROW|Escrow|escrow)\]/g, '');
+		cleanTitle = cleanTitle.replace(
+			/\[(free|paid|Free|FREE|Paid|PAID|ESCROW|Escrow|escrow)\]/g,
+			''
+		);
 
 		// Remove all | pipes
 		cleanTitle = cleanTitle.replace(/\|/g, '');
@@ -153,10 +156,11 @@
 		cleanTitle = replaceDiscourseEmojis(cleanTitle);
 
 		// make sure first letter of every word is capitalized
-		cleanTitle = cleanTitle.replace(/\b\w/g, char => char.toUpperCase());
+		cleanTitle = cleanTitle.replace(/\b\w/g, (char) => char.toUpperCase());
 
 		// Extract framework compatibility tags
-		const frameworkRegex = /\[([^\]]*(?:QB|ESX|QBCORE|QBCore|STANDALONE|QBox|OX|VRPEX|VORP|RSG|RedM|FXServer)[^\]]*)\]/gi;
+		const frameworkRegex =
+			/\[([^\]]*(?:QB|ESX|QBCORE|QBCore|STANDALONE|QBox|OX|VRPEX|VORP|RSG|RedM|FXServer)[^\]]*)\]/gi;
 		let match;
 		while ((match = frameworkRegex.exec(cleanTitle)) !== null) {
 			const frameworkText = match[1].trim();
@@ -164,9 +168,9 @@
 				// Parse multiple frameworks separated by /, &, or ,
 				const parsedFrameworks = frameworkText
 					.split(/[\/&,\+]/)
-					.map(f => f.trim())
-					.filter(f => f.length > 0)
-					.map(f => {
+					.map((f) => f.trim())
+					.filter((f) => f.length > 0)
+					.map((f) => {
 						// Normalize common framework names
 						const normalized = f.toUpperCase();
 						if (normalized.includes('QBOX')) return 'QBox';
@@ -196,15 +200,15 @@
 
 		return { cleanTitle, frameworks: uniqueFrameworks };
 	}
-	
+
 	function handleImageLoad(event: Event) {
 		const img = event.target as HTMLImageElement;
-		
+
 		// Only handle blurry background for small images, don't set card widths
 		if (cardElement && img.naturalWidth) {
 			const minWidth = 300; // Threshold for small images
 			const imageWidth = img.naturalWidth;
-			
+
 			if (imageWidth < minWidth) {
 				// For small images, add blurry background but don't change card width
 				const imageContainer = cardElement.querySelector('.topic-image') as HTMLElement;
@@ -218,7 +222,7 @@
 			}
 		}
 	}
-	
+
 	function handleImageError(event: Event) {
 		const img = event.target as HTMLImageElement;
 		img.style.display = 'none';
@@ -226,11 +230,11 @@
 		if (parent) {
 			parent.classList.add('no-image');
 		}
-		
+
 		// Remove any fixed widths to let CSS Grid handle sizing
 		setNoImageMaxWidth();
 	}
-	
+
 	function setNoImageMaxWidth() {
 		// Let CSS Grid handle sizing - don't set fixed widths
 		if (cardElement) {
@@ -238,33 +242,35 @@
 			cardElement.style.removeProperty('minWidth');
 		}
 	}
-	
+
 	// Handle the case where there's no image from the start
 	$: if (!topic.image_url && cardElement) {
 		setNoImageMaxWidth();
 	}
-	
+
 	async function openModal() {
 		showModal = true;
-		
+
 		// Only fetch preview if we don't have it already
 		if (previewContent === null && !loadingPreview) {
 			await fetchPreview();
 		}
 	}
-	
+
 	function closeModal() {
 		showModal = false;
 	}
-	
+
 	async function fetchPreview() {
 		loadingPreview = true;
 		previewError = false;
-		
+
 		try {
-			const response = await fetch(`/api/topic/${topic.id}/preview?slug=${encodeURIComponent(topic.slug)}`);
+			const response = await fetch(
+				`/api/topic/${topic.id}/preview?slug=${encodeURIComponent(topic.slug)}`
+			);
 			const data = await response.json();
-			
+
 			if (response.ok) {
 				previewContent = data.preview || '';
 				youtubeLinks = data.youtubeLinks || [];
@@ -284,32 +290,47 @@
 
 <article class="card h-100 topic-card {getResourceTypeClass(topic.tags)}" bind:this={cardElement}>
 	{#if topic.image_url}
-		<div class="topic-image clickable-image" on:click={openModal} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && openModal()}>
-			<img 
-				src={topic.image_url} 
-				alt={topic.title} 
-				loading="lazy" 
+		<div
+			class="topic-image clickable-image"
+			on:click={openModal}
+			role="button"
+			tabindex="0"
+			on:keydown={(e) => e.key === 'Enter' && openModal()}
+		>
+			<img
+				src={topic.image_url}
+				alt={topic.title}
+				loading="lazy"
 				class="card-img-top"
 				on:load={handleImageLoad}
 				on:error={handleImageError}
 			/>
 		</div>
 	{:else}
-		<div class="topic-image no-image d-flex align-items-center justify-content-center clickable-image" on:click={openModal} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && openModal()}>
+		<div
+			class="topic-image no-image d-flex align-items-center justify-content-center clickable-image"
+			on:click={openModal}
+			role="button"
+			tabindex="0"
+			on:keydown={(e) => e.key === 'Enter' && openModal()}
+		>
 			<div class="placeholder text-center text-white">
 				<span class="icon d-block mb-2" style="font-size: 3rem;">🎮</span>
 				<span class="text fw-semibold">FiveM Release</span>
 			</div>
 		</div>
 	{/if}
-	
+
 	<div class="card-body topic-content">
 		<h2 class="card-title topic-title">
-			<button class="btn btn-link title-button p-0 text-start text-decoration-none" on:click={openModal}>
+			<button
+				class="btn btn-link title-button p-0 text-start text-decoration-none"
+				on:click={openModal}
+			>
 				{titleInfo.cleanTitle}
 			</button>
 		</h2>
-		
+
 		{#if titleInfo.frameworks.length > 0}
 			<div class="framework-badges mb-2">
 				{#each titleInfo.frameworks as framework}
@@ -317,36 +338,41 @@
 				{/each}
 			</div>
 		{/if}
-		
+
 		<div class="topic-meta">
 			<div class="topic-info d-flex align-items-center gap-3 mb-3 small text-muted">
 				{#if topic.author}
 					<div class="author d-flex align-items-center">
-						<img 
-							src={getAvatarUrl(topic.author.avatar_template, 24)} 
+						<img
+							src={getAvatarUrl(topic.author.avatar_template, 24)}
 							alt={topic.author.username}
 							class="avatar rounded-circle me-2"
-							width="24" height="24"
+							width="24"
+							height="24"
 						/>
 						<span class="username">by {topic.author.username}</span>
 					</div>
 				{/if}
-				
+
 				<span class="d-flex align-items-center gap-1">
-					<span>📅</span> {topic.timeAgo}
+					<span>📅</span>
+					{topic.timeAgo}
 				</span>
 				<span class="d-flex align-items-center gap-1">
-					<span>👁️</span> {formatNumber(topic.views)}
+					<span>👁️</span>
+					{formatNumber(topic.views)}
 				</span>
 				<span class="d-flex align-items-center gap-1">
-					<span>❤️</span> {topic.like_count}
+					<span>❤️</span>
+					{topic.like_count}
 				</span>
 				<span class="d-flex align-items-center gap-1">
-					<span>💬</span> {topic.posts_count}
+					<span>💬</span>
+					{topic.posts_count}
 				</span>
 			</div>
 		</div>
-		
+
 		{#if topic.tags.length > 0}
 			<div class="tags d-flex flex-wrap gap-1">
 				{#each topic.tags.slice(0, 5) as tag}
@@ -367,11 +393,11 @@
 			{#if videoId}
 				<div class="modal-youtube-embed">
 					<div class="ratio ratio-16x9">
-						<iframe 
-							src="https://www.youtube.com/embed/{videoId}?hd=1&rel=0&modestbranding=1" 
-							title="YouTube video player" 
-							frameborder="0" 
-							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+						<iframe
+							src="https://www.youtube.com/embed/{videoId}?hd=1&rel=0&modestbranding=1"
+							title="YouTube video player"
+							frameborder="0"
+							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
 							allowfullscreen
 							class="rounded"
 						></iframe>
@@ -387,7 +413,7 @@
 				<img src={topic.image_url} alt={topic.title} class="img-fluid rounded" />
 			</div>
 		{/if}
-		
+
 		{#if titleInfo.frameworks.length > 0}
 			<div class="framework-badges mb-3">
 				{#each titleInfo.frameworks as framework}
@@ -395,28 +421,29 @@
 				{/each}
 			</div>
 		{/if}
-		
+
 		<div class="modal-meta">
 			<div class="modal-info d-flex align-items-center gap-3 mb-3 small text-muted">
 				{#if topic.author}
 					<div class="modal-author d-flex align-items-center">
-						<img 
-							src={getAvatarUrl(topic.author.avatar_template, 24)} 
+						<img
+							src={getAvatarUrl(topic.author.avatar_template, 24)}
 							alt={topic.author.username}
 							class="modal-avatar rounded-circle me-2"
-							width="24" height="24"
+							width="24"
+							height="24"
 						/>
 						<span class="modal-username">by {topic.author.username}</span>
 					</div>
 				{/if}
-				
+
 				<span>📅 {topic.timeAgo}</span>
 				<span>👁️ {formatNumber(topic.views)}</span>
 				<span>❤️ {topic.like_count}</span>
 				<span>💬 {topic.posts_count}</span>
 			</div>
 		</div>
-		
+
 		{#if topic.tags.length > 0}
 			<div class="modal-tags d-flex flex-wrap gap-1">
 				{#each topic.tags as tag}
@@ -424,16 +451,19 @@
 				{/each}
 			</div>
 		{/if}
-		
 
-		
 		<!-- Action Links Section -->
 		<div class="modal-actions-section">
 			{#if tebexLinks.length > 0}
 				<!-- Side by side layout when both buttons exist -->
 				<div class="action-links d-flex gap-3">
 					{#each tebexLinks as link}
-						<a href={link} target="_blank" rel="noopener noreferrer" class="action-button purchase-button flex-fill">
+						<a
+							href={link}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="action-button purchase-button flex-fill"
+						>
 							<div class="action-icon">💰</div>
 							<div class="action-content">
 								<div class="action-title">Purchase Resource</div>
@@ -442,8 +472,13 @@
 							<div class="action-arrow">→</div>
 						</a>
 					{/each}
-					
-					<a href={topic.url} target="_blank" rel="noopener noreferrer" class="action-button view-button flex-fill">
+
+					<a
+						href={topic.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="action-button view-button flex-fill"
+					>
 						<div class="action-icon">🔗</div>
 						<div class="action-content">
 							<div class="action-title">View Full Resource</div>
@@ -455,7 +490,12 @@
 			{:else}
 				<!-- Single button layout when only view button exists -->
 				<div class="action-links d-flex flex-column gap-3">
-					<a href={topic.url} target="_blank" rel="noopener noreferrer" class="action-button view-button">
+					<a
+						href={topic.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="action-button view-button"
+					>
 						<div class="action-icon">🔗</div>
 						<div class="action-content">
 							<div class="action-title">View Full Resource</div>
@@ -466,7 +506,7 @@
 				</div>
 			{/if}
 		</div>
-		
+
 		<div class="modal-preview-section">
 			{#if loadingPreview}
 				<div class="alert alert-info d-flex align-items-center justify-content-center" role="alert">
@@ -481,7 +521,9 @@
 					<button on:click={fetchPreview} class="btn btn-danger btn-sm">🔄 Retry</button>
 				</div>
 			{:else if previewContent}
-				<div class="alert alert-light border-start border-primary border-4 modal-preview-text preview-container">
+				<div
+					class="alert alert-light border-start border-primary border-4 modal-preview-text preview-container"
+				>
 					<div class="preview-content">{@html previewContent}</div>
 				</div>
 			{:else}
@@ -501,60 +543,60 @@
 		max-width: 100%;
 		min-width: 0;
 	}
-	
+
 	.topic-card:hover {
 		transform: translateY(-2px);
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 	}
-	
+
 	/* Resource type styling */
 	.resource-paid {
 		background: linear-gradient(135deg, #f8f4ff 0%, #f0e6ff 100%);
 	}
-	
+
 	.resource-free {
 		background: linear-gradient(135deg, #f0fdf4 0%, #e8f8ed 100%);
 	}
-	
+
 	/* Dark mode support for resource types */
-	:global([data-bs-theme="dark"]) .resource-paid {
+	:global([data-bs-theme='dark']) .resource-paid {
 		background: linear-gradient(135deg, #2a1f3d 0%, #3c2764 100%);
 	}
-	
-	:global([data-bs-theme="dark"]) .resource-free {
+
+	:global([data-bs-theme='dark']) .resource-free {
 		background: linear-gradient(135deg, #1a2e23 0%, #234a2d 100%);
 	}
-	
+
 	.topic-image {
 		width: 100%;
 		max-height: 400px;
 		overflow: hidden;
 		position: relative;
 	}
-	
+
 	.clickable-image {
 		cursor: pointer;
 		transition: opacity 0.2s ease;
 	}
-	
+
 	.clickable-image:hover {
 		opacity: 0.9;
 	}
-	
+
 	.clickable-image:focus {
 		outline: 2px solid var(--bs-primary);
 		outline-offset: 2px;
 	}
-	
+
 	/* Topic info responsive layout */
 	.topic-info {
 		flex-wrap: wrap;
 	}
-	
+
 	.topic-info .author {
 		flex-shrink: 0;
 	}
-	
+
 	/* Stack items on smaller screens */
 	@media (max-width: 480px) {
 		.topic-info {
@@ -562,21 +604,21 @@
 			align-items: flex-start !important;
 			gap: 0.5rem !important;
 		}
-		
+
 		.topic-info .author {
 			margin-bottom: 0.25rem;
 		}
 	}
-	
+
 	/* Modal info responsive layout */
 	.modal-info {
 		flex-wrap: wrap;
 	}
-	
+
 	.modal-info .modal-author {
 		flex-shrink: 0;
 	}
-	
+
 	/* Stack modal items on smaller screens */
 	@media (max-width: 480px) {
 		.modal-info {
@@ -584,12 +626,12 @@
 			align-items: flex-start !important;
 			gap: 0.5rem !important;
 		}
-		
+
 		.modal-info .modal-author {
 			margin-bottom: 0.25rem;
 		}
 	}
-	
+
 	.topic-image img {
 		width: 100%;
 		height: auto;
@@ -600,11 +642,11 @@
 		position: relative;
 		z-index: 2;
 	}
-	
+
 	.topic-image.no-image {
 		height: 200px;
 	}
-	
+
 	/* Blurry background for small images */
 	.topic-image.has-blur-background::before {
 		content: '';
@@ -618,7 +660,7 @@
 		transform: scale(1.1);
 		z-index: 1;
 	}
-	
+
 	.topic-image.has-blur-background {
 		display: flex;
 		align-items: center;
@@ -626,7 +668,7 @@
 		min-height: 200px;
 		max-height: 300px;
 	}
-	
+
 	.topic-image.has-blur-background img {
 		max-width: none;
 		max-height: 100%;
@@ -634,36 +676,36 @@
 		height: auto;
 		object-fit: contain;
 	}
-	
+
 	.topic-card:hover .topic-image img {
 		transform: scale(1.05);
 	}
-	
+
 	.topic-image.no-image {
 		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	}
-	
+
 	.title-button {
 		color: var(--bs-body-color) !important;
 		font-weight: 600 !important;
 		line-height: 1.3;
 	}
-	
+
 	.title-button:hover {
 		color: #667eea !important;
 	}
-	
+
 	.avatar {
 		border: 2px solid var(--bs-border-color);
 	}
-	
+
 	/* Framework badges */
 	.framework-badges {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.25rem;
 	}
-	
+
 	.framework-badge {
 		background-color: var(--bs-primary);
 		color: white;
@@ -672,65 +714,65 @@
 		padding: 0.25rem 0.5rem;
 		border-radius: 0.375rem;
 	}
-	
+
 	/* Modal content styles */
 	.modal-image {
 		max-height: 300px;
 		overflow: hidden;
 	}
-	
+
 	.modal-youtube-embed {
 		max-width: 100%;
 	}
-	
+
 	.modal-youtube-embed .ratio {
 		max-height: 400px;
 	}
-	
+
 	.modal-avatar {
 		border: 2px solid var(--bs-border-color);
 	}
-	
+
 	.modal-preview-text {
 		line-height: 1.6;
 	}
-	
+
 	/* Preview content formatting */
 	.preview-content {
 		font-size: 0.95rem;
 		line-height: 1.6;
 	}
-	
+
 	.preview-content p {
 		margin-bottom: 1rem;
 	}
-	
+
 	.preview-content p:last-child {
 		margin-bottom: 0;
 	}
-	
+
 	.preview-content strong,
 	.preview-content b {
 		font-weight: 600;
 		color: var(--bs-emphasis-color);
 	}
-	
+
 	.preview-content em,
 	.preview-content i {
 		font-style: italic;
 		color: var(--bs-emphasis-color);
 	}
-	
+
 	.preview-content ul,
 	.preview-content ol {
 		margin: 0.5rem 0;
 		padding-left: 1.5rem;
 	}
-	
+
 	.preview-content li {
 		margin-bottom: 0.25rem;
 	}
-	
+
 	.preview-content h1,
 	.preview-content h2,
 	.preview-content h3,
@@ -742,14 +784,26 @@
 		margin: 1rem 0 0.5rem 0;
 		line-height: 1.3;
 	}
-	
-	.preview-content h1 { font-size: 1.4rem; }
-	.preview-content h2 { font-size: 1.3rem; }
-	.preview-content h3 { font-size: 1.2rem; }
-	.preview-content h4 { font-size: 1.1rem; }
-	.preview-content h5 { font-size: 1.05rem; }
-	.preview-content h6 { font-size: 1rem; }
-	
+
+	.preview-content h1 {
+		font-size: 1.4rem;
+	}
+	.preview-content h2 {
+		font-size: 1.3rem;
+	}
+	.preview-content h3 {
+		font-size: 1.2rem;
+	}
+	.preview-content h4 {
+		font-size: 1.1rem;
+	}
+	.preview-content h5 {
+		font-size: 1.05rem;
+	}
+	.preview-content h6 {
+		font-size: 1rem;
+	}
+
 	.preview-content .forum-quote,
 	.preview-content blockquote {
 		background-color: var(--bs-light);
@@ -760,7 +814,7 @@
 		font-style: italic;
 		color: var(--bs-secondary);
 	}
-	
+
 	.preview-content .code-block,
 	.preview-content pre {
 		background-color: var(--bs-dark);
@@ -772,7 +826,7 @@
 		overflow-x: auto;
 		margin: 1rem 0;
 	}
-	
+
 	.preview-content .inline-code,
 	.preview-content code {
 		background-color: var(--bs-light);
@@ -782,7 +836,7 @@
 		font-family: 'Courier New', Courier, monospace;
 		font-size: 0.875rem;
 	}
-	
+
 	.action-button {
 		display: flex;
 		align-items: center;
@@ -796,14 +850,14 @@
 		position: relative;
 		overflow: hidden;
 	}
-	
+
 	.action-button:hover {
 		transform: translateY(-2px);
 		box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 		text-decoration: none;
 		color: var(--bs-body-color);
 	}
-	
+
 	.action-button:before {
 		content: '';
 		position: absolute;
@@ -814,132 +868,132 @@
 		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
 		transition: left 0.5s;
 	}
-	
+
 	.action-button:hover:before {
 		left: 100%;
 	}
-	
+
 	.purchase-button {
 		background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
 		border-color: #28a745;
 	}
-	
+
 	.purchase-button:hover {
 		background: linear-gradient(135deg, #c3e6cb 0%, #b6dfbb 100%);
 		color: var(--bs-body-color);
 	}
-	
+
 	.view-button {
 		background: linear-gradient(135deg, #cce7ff 0%, #b3d9ff 100%);
 		border-color: #007bff;
 	}
-	
+
 	.view-button:hover {
 		background: linear-gradient(135deg, #b3d9ff 0%, #99ccff 100%);
 		color: var(--bs-body-color);
 	}
-	
+
 	.action-icon {
 		font-size: 1.5rem;
 		margin-right: 1rem;
 		min-width: 40px;
 		text-align: center;
 	}
-	
+
 	.action-content {
 		flex: 1;
 	}
-	
+
 	.action-title {
 		font-weight: 600;
 		font-size: 1rem;
 		margin-bottom: 0.25rem;
 	}
-	
+
 	.action-subtitle {
 		font-size: 0.875rem;
 		color: var(--bs-secondary);
 		opacity: 0.8;
 	}
-	
+
 	.action-arrow {
 		font-size: 1.25rem;
 		opacity: 0.6;
 		transition: all 0.2s ease;
 		margin-left: 1rem;
 	}
-	
+
 	.action-button:hover .action-arrow {
 		opacity: 1;
 		transform: translateX(4px);
 	}
-	
+
 	/* Responsive design for side-by-side buttons */
 	@media (max-width: 576px) {
 		.action-links.d-flex:not(.flex-column) {
 			flex-direction: column !important;
 		}
-		
+
 		.action-links.d-flex:not(.flex-column) .action-button {
 			flex: none !important;
 		}
 	}
-	
+
 	/* Dark mode support for action buttons */
-	:global([data-bs-theme="dark"]) .action-button {
+	:global([data-bs-theme='dark']) .action-button {
 		background: linear-gradient(135deg, var(--bs-dark) 0%, #2c2c2c 100%);
 		border-color: var(--bs-border-color);
 		color: var(--bs-body-color);
 	}
-	
-	:global([data-bs-theme="dark"]) .action-button:hover {
+
+	:global([data-bs-theme='dark']) .action-button:hover {
 		color: var(--bs-body-color);
 	}
-	
-	:global([data-bs-theme="dark"]) .purchase-button {
+
+	:global([data-bs-theme='dark']) .purchase-button {
 		background: linear-gradient(135deg, #1e4d2b 0%, #2d5a37 100%);
 		border-color: #28a745;
 	}
-	
-	:global([data-bs-theme="dark"]) .purchase-button:hover {
+
+	:global([data-bs-theme='dark']) .purchase-button:hover {
 		background: linear-gradient(135deg, #2d5a37 0%, #3a6b44 100%);
 		color: var(--bs-body-color);
 	}
-	
-	:global([data-bs-theme="dark"]) .view-button {
+
+	:global([data-bs-theme='dark']) .view-button {
 		background: linear-gradient(135deg, #1e3a5f 0%, #2d4a73 100%);
 		border-color: #007bff;
 	}
-	
-	:global([data-bs-theme="dark"]) .view-button:hover {
+
+	:global([data-bs-theme='dark']) .view-button:hover {
 		background: linear-gradient(135deg, #2d4a73 0%, #3a5987 100%);
 		color: var(--bs-body-color);
 	}
-	
+
 	/* Dark mode support for preview container */
-	:global([data-bs-theme="dark"]) .preview-container {
+	:global([data-bs-theme='dark']) .preview-container {
 		background-color: var(--bs-dark) !important;
 		color: var(--bs-body-color) !important;
 	}
-	
+
 	/* Dark mode support for forum quotes */
-	:global([data-bs-theme="dark"]) .preview-content .forum-quote,
-	:global([data-bs-theme="dark"]) .preview-content blockquote {
+	:global([data-bs-theme='dark']) .preview-content .forum-quote,
+	:global([data-bs-theme='dark']) .preview-content blockquote {
 		background-color: var(--bs-dark);
 		color: var(--bs-body-color);
 	}
-	
+
 	/* Dark mode support for code blocks */
-	:global([data-bs-theme="dark"]) .preview-content .code-block,
-	:global([data-bs-theme="dark"]) .preview-content pre {
+	:global([data-bs-theme='dark']) .preview-content .code-block,
+	:global([data-bs-theme='dark']) .preview-content pre {
 		background-color: #1a1a1a;
 		color: var(--bs-light);
 	}
-	
+
 	/* Dark mode support for inline code */
-	:global([data-bs-theme="dark"]) .preview-content .inline-code,
-	:global([data-bs-theme="dark"]) .preview-content code {
+	:global([data-bs-theme='dark']) .preview-content .inline-code,
+	:global([data-bs-theme='dark']) .preview-content code {
 		background-color: var(--bs-dark);
 		color: var(--bs-light);
 	}
-</style> 
+</style>
